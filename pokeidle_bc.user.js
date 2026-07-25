@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Breeding Center - Breeding calculator
 // @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  Breeding calculator
+// @version      1.1
+// @description  Breeding calculator with Double Stones IV gain estimation
 // @author       Phoslead
 // @match        https://poke.idleworld.online/*
 // @grant        GM_addStyle
@@ -162,6 +162,18 @@
             border-color: #b99a58 #7a5c22 #4f3d17;
         }
 
+        .brd-iv-gain-tag {
+            font-size: 9px;
+            font-weight: 800;
+            color: #ffd700;
+            background: rgba(255, 215, 0, 0.15);
+            border: 1px solid rgba(255, 215, 0, 0.5);
+            border-radius: 3px;
+            padding: 0px 4px;
+            margin-left: 3px;
+            cursor: help;
+        }
+
         .brd-iv-warn-ico {
             width: 14px;
             height: 14px;
@@ -250,6 +262,8 @@
         .brd-tier-count {
             color: #7fd4ff;
             font-weight: 700;
+            display: inline-flex;
+            align-items: center;
         }
 
         .brd-tier-kills {
@@ -602,10 +616,14 @@
                     const stonesCostTotal = breedsNeeded * singleBreedStonesCost;
                     const totalCostGold = baseCostTotal + pheroCostTotal + stonesCostTotal;
 
+                    // Calculate expected IV Gain with Double Stones (5% chance = 1 IV per 20 breeds)
+                    const expectedIvGain = doubleStones ? Math.floor(breedsNeeded / 20) : 0;
+
                     projections.push({
                         tier: tier.label,
                         targetQualityMin: tier.min,
                         breedsNeeded,
+                        expectedIvGain,
                         killsNeeded,
                         hoursNeeded,
                         pheromonesNeeded: mode === 'pheromones' ? totalPheromones : 0,
@@ -671,26 +689,23 @@
 
     // 7. Convert Payload to CSV Format (Clean & Deduplicated)
     function convertPayloadToCSV(payload) {
-    let csv = '\uFEFF'; // BOM UTF-8
+        let csv = '\uFEFF'; // BOM UTF-8
 
-    // Encabezados planos estándar
-    csv += 'Breed Step,Parent Name,Parent IV,Parent Quality,Min Secondary Quality,Max Secondary Quality,Child Quality Result,Tier Reached,Mode,Growth System,Total Cost Gold\n';
+        csv += 'Breed Step,Parent Name,Parent IV,Parent Quality,Min Secondary Quality,Max Secondary Quality,Child Quality Result,Tier Reached,Mode,Growth System,Total Cost Gold\n';
 
-    const pName = payload.parents.inheritedBestParent ? payload.parents.inheritedBestParent.name : '';
-    const pIv = payload.parents.inheritedBestParent ? payload.parents.inheritedBestParent.iv : '';
-    const pQ = payload.parents.inheritedBestParent ? payload.parents.inheritedBestParent.quality : '';
-    const mode = payload.settings.calculationMode;
-    const growth = payload.settings.growthSystem;
+        const pName = payload.parents.inheritedBestParent ? payload.parents.inheritedBestParent.name : '';
+        const pIv = payload.parents.inheritedBestParent ? payload.parents.inheritedBestParent.iv : '';
+        const pQ = payload.parents.inheritedBestParent ? payload.parents.inheritedBestParent.quality : '';
+        const mode = payload.settings.calculationMode;
+        const growth = payload.settings.growthSystem;
 
-    payload.progressiveMaterialSequence.forEach(s => {
-        // Encontrar costo acumulado hasta este paso si aplica
-        const baseCost = s.breedStep * COST_PER_BREED_GOLD;
+        payload.progressiveMaterialSequence.forEach(s => {
+            const baseCost = s.breedStep * COST_PER_BREED_GOLD;
+            csv += `${s.breedStep},"${pName}",${pIv},${pQ},${s.minSecondaryQuality},${s.maxSecondaryQuality},${s.childResultingQuality},"${s.targetTierReached}","${mode}","${growth}",${baseCost}\n`;
+        });
 
-        csv += `${s.breedStep},"${pName}",${pIv},${pQ},${s.minSecondaryQuality},${s.maxSecondaryQuality},${s.childResultingQuality},"${s.targetTierReached}","${mode}","${growth}",${baseCost}\n`;
-    });
-
-    return csv;
-}
+        return csv;
+    }
 
     // 8. Main Render Loop
     function runCalculatorLoop() {
@@ -824,6 +839,15 @@
                         timeStr = ` - ${hoursNeeded}h`;
                     }
 
+                    // Calculate Double Stone IV Bonus Tag
+                    let ivGainTagHtml = '';
+                    if (doubleStones) {
+                        const expectedIvGain = Math.floor(breedsNeeded / 20);
+                        if (expectedIvGain >= 1) {
+                            ivGainTagHtml = `<span class="brd-iv-gain-tag" title="Expected IV boost from Double Stones: +${expectedIvGain} IVs across ${breedsNeeded} breeds (5% chance per breed)">+${expectedIvGain} IV</span>`;
+                        }
+                    }
+
                     const totalPheromones = breedsNeeded * PHEROMONES_PER_BREED;
                     const baseCostTotal = breedsNeeded * COST_PER_BREED_GOLD;
                     const pheroCostTotal = mode === 'pheromones' ? totalPheromones * settings.pheromoneUnitPrice : 0;
@@ -852,7 +876,10 @@
                                 <span class="brd-tier-target">(${tier.min.toFixed(1)}+)</span>
                             </span>
                             <div class="brd-tier-right">
-                                <span class="brd-tier-count">~${breedsNeeded.toLocaleString()} ${breedsNeeded === 1 ? 'breed' : 'breeds'}</span>
+                                <span class="brd-tier-count">
+                                    ~${breedsNeeded.toLocaleString()} ${breedsNeeded === 1 ? 'breed' : 'breeds'}
+                                    ${ivGainTagHtml}
+                                </span>
                                 <span class="brd-tier-kills" title="Total hunt defeats required (${killsNeeded.toLocaleString()} kills)">(${formatKills(killsNeeded)}${timeStr})</span>
                                 ${mode === 'pheromones' ? `
                                     <span class="brd-tier-phero" title="Total pheromones required">
