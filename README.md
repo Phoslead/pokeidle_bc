@@ -46,7 +46,7 @@ An advanced calculation tool designed as a UI overlay for the Poke idle World Br
    - It also detects any required **Evolution Stones** and whether the **Double Stones** option is active.
 
 2. **Configure Settings:**
-   - **Pheromone Price:** Set the market or purchasing unit cost for pheromones (defaults to 100,000 Gold).
+   - **Pheromone Price:** Set the market or purchasing unit cost for pheromones (defaults to 1,000,000 Gold).
    - **Stone Prices:** Input the current market price for any required evolution stones if you want to include them in the total gold calculations.
    - **Kills/h:** Enter your hourly defeat rate to project total farming time.
 
