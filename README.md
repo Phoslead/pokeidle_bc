@@ -34,6 +34,8 @@ An advanced calculation tool designed as a UI overlay for the Poke idle World Br
 #### JSON & CSV Export Format
 <img width="1224" height="897" alt="image" src="https://github.com/user-attachments/assets/26cc4dc3-1b2e-4b80-b0fe-815c9d550d3e" />
 
+#### IV Loss Warning
+<img width="401" height="119" alt="image" src="https://github.com/user-attachments/assets/34b4e508-cb5a-439a-97e2-bf3f209fce47" />
 
 ---
 
