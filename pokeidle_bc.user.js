@@ -671,55 +671,26 @@
 
     // 7. Convert Payload to CSV Format (Clean & Deduplicated)
     function convertPayloadToCSV(payload) {
-        let csv = '\uFEFF'; // UTF-8 BOM
+    let csv = '\uFEFF'; // BOM UTF-8
 
-        // Parents Info
-        csv += '--- PARENTS INFO ---\n';
-        csv += 'Slot,Name,IV,Quality\n';
-        if (payload.parents.parent1) {
-            csv += `Parent 1,"${payload.parents.parent1.name}",${payload.parents.parent1.iv},${payload.parents.parent1.quality}\n`;
-        }
-        if (payload.parents.parent2) {
-            csv += `Parent 2,"${payload.parents.parent2.name}",${payload.parents.parent2.iv},${payload.parents.parent2.quality}\n`;
-        }
-        if (payload.parents.inheritedBestParent) {
-            csv += `Inherited Best,"${payload.parents.inheritedBestParent.name}",${payload.parents.inheritedBestParent.iv},${payload.parents.inheritedBestParent.quality}\n`;
-        }
+    // Encabezados planos estándar
+    csv += 'Breed Step,Parent Name,Parent IV,Parent Quality,Min Secondary Quality,Max Secondary Quality,Child Quality Result,Tier Reached,Mode,Growth System,Total Cost Gold\n';
 
-        // Settings
-        csv += '\n--- SETTINGS ---\n';
-        csv += `Mode,${payload.settings.calculationMode}\n`;
-        csv += `Growth System,${payload.settings.growthSystem}\n`;
-        csv += `Growth Delta (+Q),${payload.settings.growthDeltaPerBreed}\n`;
-        csv += `Pheromone Unit Price,${payload.settings.pheromoneUnitPrice}\n`;
-        csv += `Kills per Hour,${payload.settings.killsPerHour || 0}\n`;
-        csv += `Calculate with Stones,${payload.settings.useStonesCost}\n`;
-        csv += `Double Stones Active,${payload.settings.doubleStonesActive}\n`;
+    const pName = payload.parents.inheritedBestParent ? payload.parents.inheritedBestParent.name : '';
+    const pIv = payload.parents.inheritedBestParent ? payload.parents.inheritedBestParent.iv : '';
+    const pQ = payload.parents.inheritedBestParent ? payload.parents.inheritedBestParent.quality : '';
+    const mode = payload.settings.calculationMode;
+    const growth = payload.settings.growthSystem;
 
-        if (payload.settings.requiredStones.length > 0) {
-            csv += '\n--- STONES REQUIRED ---\n';
-            csv += 'Stone Name,Base Qty,Effective Qty,Unit Price\n';
-            payload.settings.requiredStones.forEach(st => {
-                csv += `"${st.name}",${st.baseQty},${st.effectiveQtyPerBreed},${st.unitPrice}\n`;
-            });
-        }
+    payload.progressiveMaterialSequence.forEach(s => {
+        // Encontrar costo acumulado hasta este paso si aplica
+        const baseCost = s.breedStep * COST_PER_BREED_GOLD;
 
-        // Tier Projections
-        csv += '\n--- ESTIMATED PROJECTIONS BY TIER ---\n';
-        csv += 'Tier,Target Q,Breeds Needed,Kills Needed,Hours Needed,Pheromones Needed,Base Fee Gold,Pheromones Gold,Stones Gold,Total Gold\n';
-        payload.projections.forEach(p => {
-            csv += `"${p.tier}",${p.targetQualityMin},${p.breedsNeeded},${p.killsNeeded},${p.hoursNeeded || ''},${p.pheromonesNeeded},${p.costs.baseFeeGold},${p.costs.pheromonesGold},${p.costs.stonesGold},${p.costs.totalGold}\n`;
-        });
+        csv += `${s.breedStep},"${pName}",${pIv},${pQ},${s.minSecondaryQuality},${s.maxSecondaryQuality},${s.childResultingQuality},"${s.targetTierReached}","${mode}","${growth}",${baseCost}\n`;
+    });
 
-        // Unique Progressive Material Breakdown
-        csv += '\n--- PROGRESSIVE MATERIAL BREAKDOWN (SEQUENCE) ---\n';
-        csv += 'Breed Step,Min Sec Quality,Max Sec Quality,Child Quality Result,Tier Reached\n';
-        payload.progressiveMaterialSequence.forEach(s => {
-            csv += `${s.breedStep},${s.minSecondaryQuality},${s.maxSecondaryQuality},${s.childResultingQuality},"${s.targetTierReached}"\n`;
-        });
-
-        return csv;
-    }
+    return csv;
+}
 
     // 8. Main Render Loop
     function runCalculatorLoop() {
