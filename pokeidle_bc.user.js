@@ -73,7 +73,7 @@
 
     // Global Settings State
     let settings = {
-        pheromoneUnitPrice: 100000,
+        pheromoneUnitPrice: 1000000,
         killsPerHour: 0,
         growthType: 'avg',
         isFolded: true,
