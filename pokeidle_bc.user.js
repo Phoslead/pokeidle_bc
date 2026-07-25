@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Breeding Center - Breeding calculator
 // @namespace    http://tampermonkey.net/
-// @version      1.1
-// @description  Breeding calculator with Double Stones IV gain estimation
+// @version      1.2
+// @description  Breeding calculator with estimation and Sub-chain Secondary Breeding Costs
 // @author       Phoslead
 // @match        https://poke.idleworld.online/*
 // @grant        GM_addStyle
@@ -16,6 +16,7 @@
     const PHEROMONES_PER_BREED = 9;
     const KILLS_PER_EGG = 3000;
     const MAX_QUALITY_DIFF = 0.15;
+    const WILD_MAX_QUALITY = 1.80; // Cap for wild pokémon quality
 
     // Growth Rates: Average vs Minimum
     const GROWTH_RATES = {
@@ -78,6 +79,7 @@
         growthType: 'avg',
         isFolded: true,
         useStonesCost: false,
+        includeSubchainCost: false, // New setting for Sub-chain Calculation
         stonePrices: {},
         expandedTierLabel: null
     };
@@ -353,6 +355,26 @@
             font-weight: 700;
         }
 
+        .brd-subtier-tag {
+            font-size: 9px;
+            font-weight: 700;
+            padding: 1px 4px;
+            border-radius: 2px;
+            margin-left: 4px;
+        }
+
+        .brd-subtier-tag.wild {
+            color: #63d873;
+            background: rgba(99, 216, 115, 0.15);
+            border: 1px solid rgba(99, 216, 115, 0.4);
+        }
+
+        .brd-subtier-tag.bred {
+            color: #ff8ce8;
+            background: rgba(255, 140, 232, 0.15);
+            border: 1px solid rgba(255, 140, 232, 0.4);
+        }
+
         .brd-settings-wrap {
             margin-top: 8px;
             padding-top: 6px;
@@ -569,6 +591,23 @@
         return checkbox ? checkbox.checked : false;
     }
 
+    // Helper: Calculate Subchain Breeding Cost for Secondary Materials (> 1.80 Q)
+    function calculateSubchainCostForBreed(currentQ, mode, avgQDelta, singleBreedStonesCost) {
+        if (!settings.includeSubchainCost) return 0;
+
+        const reqSecQ = Math.max(0, currentQ - MAX_QUALITY_DIFF);
+        if (reqSecQ <= WILD_MAX_QUALITY) return 0;
+
+        const diffToBreed = reqSecQ - WILD_MAX_QUALITY;
+        const subSteps = Math.ceil(diffToBreed / avgQDelta);
+
+        const subBaseCost = subSteps * COST_PER_BREED_GOLD;
+        const subPheroCost = mode === 'pheromones' ? (subSteps * PHEROMONES_PER_BREED * settings.pheromoneUnitPrice) : 0;
+        const subStonesCost = subSteps * singleBreedStonesCost;
+
+        return subBaseCost + subPheroCost + subStonesCost;
+    }
+
     // 6. Generate Optimized Payload for Export (Deduplicated Progressive Steps)
     function generateExportPayload() {
         const parents = getSelectedParents();
@@ -614,9 +653,18 @@
                     const baseCostTotal = breedsNeeded * COST_PER_BREED_GOLD;
                     const pheroCostTotal = mode === 'pheromones' ? totalPheromones * settings.pheromoneUnitPrice : 0;
                     const stonesCostTotal = breedsNeeded * singleBreedStonesCost;
-                    const totalCostGold = baseCostTotal + pheroCostTotal + stonesCostTotal;
 
-                    // Calculate expected IV Gain with Double Stones (5% chance = 1 IV per 20 breeds)
+                    // Calculate Subchain Costs if Enabled
+                    let subchainCostTotal = 0;
+                    if (settings.includeSubchainCost) {
+                        let stepQ = bestParent.qVal;
+                        for (let s = 0; s < breedsNeeded; s++) {
+                            subchainCostTotal += calculateSubchainCostForBreed(stepQ, mode, avgQDelta, singleBreedStonesCost);
+                            stepQ += avgQDelta;
+                        }
+                    }
+
+                    const totalCostGold = baseCostTotal + pheroCostTotal + stonesCostTotal + subchainCostTotal;
                     const expectedIvGain = doubleStones ? Math.floor(breedsNeeded / 20) : 0;
 
                     projections.push({
@@ -631,6 +679,7 @@
                             baseFeeGold: baseCostTotal,
                             pheromonesGold: pheroCostTotal,
                             stonesGold: stonesCostTotal,
+                            subchainSecGold: subchainCostTotal,
                             totalGold: totalCostGold
                         }
                     });
@@ -646,12 +695,14 @@
                 const childQ = currentQ + avgQDelta;
                 const minSecQ = Math.max(0, currentQ - MAX_QUALITY_DIFF);
                 const maxSecQ = Math.max(0, currentQ - 0.01);
+                const requiresBreeding = minSecQ > WILD_MAX_QUALITY;
 
                 progressiveMaterialSequence.push({
                     breedStep: step,
                     minSecondaryQuality: parseFloat(minSecQ.toFixed(4)),
                     maxSecondaryQuality: parseFloat(maxSecQ.toFixed(4)),
                     childResultingQuality: parseFloat(childQ.toFixed(4)),
+                    secondarySourceType: requiresBreeding ? 'Bred' : 'Wild',
                     targetTierReached: getTierLabelForQ(childQ)
                 });
 
@@ -673,6 +724,7 @@
                 pheromoneUnitPrice: settings.pheromoneUnitPrice,
                 killsPerHour: settings.killsPerHour,
                 useStonesCost: settings.useStonesCost,
+                includeSubchainCost: settings.includeSubchainCost,
                 doubleStonesActive: doubleStones,
                 stonePrices: settings.stonePrices,
                 requiredStones: requiredStones.map(st => ({
@@ -691,7 +743,7 @@
     function convertPayloadToCSV(payload) {
         let csv = '\uFEFF'; // BOM UTF-8
 
-        csv += 'Breed Step,Parent Name,Parent IV,Parent Quality,Min Secondary Quality,Max Secondary Quality,Child Quality Result,Tier Reached,Mode,Growth System,Total Cost Gold\n';
+        csv += 'Breed Step,Parent Name,Parent IV,Parent Quality,Min Secondary Quality,Max Secondary Quality,Secondary Source,Child Quality Result,Tier Reached,Mode,Growth System,Total Cost Gold\n';
 
         const pName = payload.parents.inheritedBestParent ? payload.parents.inheritedBestParent.name : '';
         const pIv = payload.parents.inheritedBestParent ? payload.parents.inheritedBestParent.iv : '';
@@ -701,7 +753,7 @@
 
         payload.progressiveMaterialSequence.forEach(s => {
             const baseCost = s.breedStep * COST_PER_BREED_GOLD;
-            csv += `${s.breedStep},"${pName}",${pIv},${pQ},${s.minSecondaryQuality},${s.maxSecondaryQuality},${s.childResultingQuality},"${s.targetTierReached}","${mode}","${growth}",${baseCost}\n`;
+            csv += `${s.breedStep},"${pName}",${pIv},${pQ},${s.minSecondaryQuality},${s.maxSecondaryQuality},"${s.secondarySourceType}",${s.childResultingQuality},"${s.targetTierReached}","${mode}","${growth}",${baseCost}\n`;
         });
 
         return csv;
@@ -853,7 +905,17 @@
                     const pheroCostTotal = mode === 'pheromones' ? totalPheromones * settings.pheromoneUnitPrice : 0;
                     const stonesCostTotal = breedsNeeded * singleBreedStonesCost;
 
-                    const totalCostGold = baseCostTotal + pheroCostTotal + stonesCostTotal;
+                    // Calculate Subchain Costs if Enabled
+                    let subchainCostTotal = 0;
+                    if (settings.includeSubchainCost) {
+                        let stepQ = bestParent.qVal;
+                        for (let s = 0; s < breedsNeeded; s++) {
+                            subchainCostTotal += calculateSubchainCostForBreed(stepQ, mode, avgQDelta, singleBreedStonesCost);
+                            stepQ += avgQDelta;
+                        }
+                    }
+
+                    const totalCostGold = baseCostTotal + pheroCostTotal + stonesCostTotal + subchainCostTotal;
                     const costInMillions = (totalCostGold / 1000000).toLocaleString(undefined, { maximumFractionDigits: 1 });
 
                     let costTooltip = `Base Fee: ${formatM(baseCostTotal)}`;
@@ -862,6 +924,9 @@
                     }
                     if (settings.useStonesCost && stonesCostTotal > 0) {
                         costTooltip += `\nStones: ${formatM(stonesCostTotal)}`;
+                    }
+                    if (settings.includeSubchainCost && subchainCostTotal > 0) {
+                        costTooltip += `\nSub-chain Sec (>1.80Q): ${formatM(subchainCostTotal)}`;
                     }
                     costTooltip += `\nTotal: ${formatM(totalCostGold)}`;
 
@@ -914,10 +979,15 @@
                             const maxSecColor = getQualityColor(maxSecQ);
                             const childColor = getQualityColor(childQ);
 
+                            const isBredSec = minSecQ > WILD_MAX_QUALITY;
+                            const secTagHtml = isBredSec 
+                                ? `<span class="brd-subtier-tag bred" title="Secondary material exceeds wild cap (1.80 Q). Must be bred beforehand.">🧬 Bred (>1.80)</span>`
+                                : `<span class="brd-subtier-tag wild" title="Can be caught directly in the wild (≤ 1.80 Q).">🎯 Wild</span>`;
+
                             htmlBox += `
                                 <div class="brd-subtier-item">
                                     <span class="brd-subtier-step">Breed #${step}</span>
-                                    <span>Secondary Material: <strong class="brd-subtier-q" style="color: ${minSecColor};">Q ${minSecQ.toFixed(2)}</strong> to <strong class="brd-subtier-q" style="color: ${maxSecColor};">Q ${maxSecQ.toFixed(2)}</strong></span>
+                                    <span>Sec: <strong class="brd-subtier-q" style="color: ${minSecColor};">Q ${minSecQ.toFixed(2)}</strong> to <strong class="brd-subtier-q" style="color: ${maxSecColor};">Q ${maxSecQ.toFixed(2)}</strong> ${secTagHtml}</span>
                                     <span>Child: <strong class="brd-subtier-q" style="color: ${childColor};">Q ${childQ.toFixed(4)}</strong></span>
                                 </div>
                             `;
@@ -981,6 +1051,12 @@
                     </div>
                     ${stonesInputsHtml}
                     <div class="brd-settings-row">
+                        <label class="brd-checkbox-label" title="Adds the extra breeding costs to craft required secondary materials that exceed the wild quality cap (1.80 Q)">
+                            <input type="checkbox" id="includeSubchainCheckbox" ${settings.includeSubchainCost ? 'checked' : ''}>
+                            <span>Include sub-breeding costs (Sec > 1.80 Q)</span>
+                        </label>
+                    </div>
+                    <div class="brd-settings-row">
                         <span>Growth System:</span>
                         <div class="brd-radio-group">
                             <label title="Average Growth (+0.0096 Free / +0.1875 Phero)">
@@ -1032,6 +1108,14 @@
         if (useStonesCb) {
             useStonesCb.addEventListener('change', (e) => {
                 settings.useStonesCost = e.target.checked;
+                lastStateSignature = '';
+            });
+        }
+
+        const includeSubchainCb = document.getElementById('includeSubchainCheckbox');
+        if (includeSubchainCb) {
+            includeSubchainCb.addEventListener('change', (e) => {
+                settings.includeSubchainCost = e.target.checked;
                 lastStateSignature = '';
             });
         }
