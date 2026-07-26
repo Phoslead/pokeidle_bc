@@ -79,7 +79,7 @@ This userscript is compatible with any modern desktop browser running a script m
 
 ### Option 1: Automatic Installation (Recommended)
 
-1. Make sure you have a script manager extension (such as **Tampermonkey**) installed in your browser.
+1. Make sure you have a script manager extension (such as **[Tampermonkey](https://www.tampermonkey.net/)**) installed in your browser.
 2. Click the link below to install the script automatically:
 
 👉 **[INSTALL USERSCRIPT DIRECTLY](https://raw.githubusercontent.com/hariseld/pokeidle_bc/main/pokeidle_bc.user.js)** 👈
