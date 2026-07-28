@@ -81,7 +81,14 @@
         useStonesCost: false,
         includeSubchainCost: false, // New setting for Sub-chain Calculation
         stonePrices: {},
-        expandedTierLabel: null
+        expandedTierLabel: null,
+        simulateParents: false,
+        simParent1IV: 0,
+        simParent1Q: 1.0,
+        simParent1QRaw: '1',
+        simParent2IV: 0,
+        simParent2Q: 1.0,
+        simParent2QRaw: '1'
     };
 
     // 1. Custom CSS Injection
@@ -556,6 +563,13 @@
             parents.push({ name, ivVal, qVal });
         });
 
+        if (settings.simulateParents) {
+            return [
+                { name: parents[0]?.name || 'Sim P1', ivVal: settings.simParent1IV, qVal: settings.simParent1Q },
+                { name: parents[1]?.name || 'Sim P2', ivVal: settings.simParent2IV, qVal: settings.simParent2Q }
+            ];
+        }
+
         return parents;
     }
 
@@ -861,6 +875,32 @@
         // Fixed Top Blocks
         let htmlBox = `
             <div class="brd-custom-head">CALCULATOR</div>
+        `;
+
+        if (settings.simulateParents) {
+            htmlBox += `
+            <div class="brd-settings-row" style="margin-bottom: 6px; justify-content: center; background: rgba(0, 0, 0, 0.4); padding: 4px; border-radius: 4px; border: 1px dashed rgba(216, 184, 113, 0.3);">
+                <div class="brd-setting-item">
+                    <span style="color: #d8b871; font-weight: bold;">P1 IV:</span>
+                    <input type="text" id="simP1IvInput" value="${settings.simParent1IV}" inputmode="numeric" autocomplete="off" style="width:35px;">
+                </div>
+                <div class="brd-setting-item">
+                    <span style="color: #d8b871; font-weight: bold;">P1 Q:</span>
+                    <input type="text" id="simP1QInput" value="${settings.simParent1QRaw !== undefined ? settings.simParent1QRaw : settings.simParent1Q}" autocomplete="off" style="width:45px;">
+                </div>
+                <div class="brd-setting-item">
+                    <span style="color: #d8b871; font-weight: bold;">P2 IV:</span>
+                    <input type="text" id="simP2IvInput" value="${settings.simParent2IV}" inputmode="numeric" autocomplete="off" style="width:35px;">
+                </div>
+                <div class="brd-setting-item">
+                    <span style="color: #d8b871; font-weight: bold;">P2 Q:</span>
+                    <input type="text" id="simP2QInput" value="${settings.simParent2QRaw !== undefined ? settings.simParent2QRaw : settings.simParent2Q}" autocomplete="off" style="width:45px;">
+                </div>
+            </div>
+            `;
+        }
+
+        htmlBox += `
             <div class="brd-poke-info">
                 <span class="brd-poke-tag">Child</span>
                 <span class="brd-poke-name">${bestParent.name}</span>
@@ -1057,6 +1097,12 @@
                         </label>
                     </div>
                     <div class="brd-settings-row">
+                        <label class="brd-checkbox-label" title="Simulate parents IV and Quality">
+                            <input type="checkbox" id="simulateParentsCheckbox" ${settings.simulateParents ? 'checked' : ''}>
+                            <span>Simulate Parents</span>
+                        </label>
+                    </div>
+                    <div class="brd-settings-row">
                         <span>Growth System:</span>
                         <div class="brd-radio-group">
                             <label title="Average Growth (+0.0096 Free / +0.1875 Phero)">
@@ -1116,6 +1162,66 @@
         if (includeSubchainCb) {
             includeSubchainCb.addEventListener('change', (e) => {
                 settings.includeSubchainCost = e.target.checked;
+                lastStateSignature = '';
+            });
+        }
+
+        const simulateParentsCb = document.getElementById('simulateParentsCheckbox');
+        if (simulateParentsCb) {
+            simulateParentsCb.addEventListener('change', (e) => {
+                settings.simulateParents = e.target.checked;
+                lastStateSignature = '';
+            });
+        }
+
+        const simP1IvInput = document.getElementById('simP1IvInput');
+        if (simP1IvInput) {
+            simP1IvInput.addEventListener('input', (e) => {
+                let cleanVal = e.target.value.replace(/\D/g, '');
+                e.target.value = cleanVal;
+                settings.simParent1IV = parseInt(cleanVal, 10) || 0;
+                lastStateSignature = '';
+            });
+        }
+
+        const simP1QInput = document.getElementById('simP1QInput');
+        if (simP1QInput) {
+            simP1QInput.addEventListener('input', (e) => {
+                let cleanVal = e.target.value.replace(/[^\d.]/g, '');
+                if (cleanVal.split('.').length > 2) cleanVal = cleanVal.replace(/\.+$/, '');
+                const parts = cleanVal.split('.');
+                if (parts.length === 2 && parts[1].length > 4) {
+                    cleanVal = parts[0] + '.' + parts[1].substring(0, 4);
+                }
+                e.target.value = cleanVal;
+                settings.simParent1QRaw = cleanVal;
+                settings.simParent1Q = parseFloat(cleanVal) || 0;
+                lastStateSignature = '';
+            });
+        }
+
+        const simP2IvInput = document.getElementById('simP2IvInput');
+        if (simP2IvInput) {
+            simP2IvInput.addEventListener('input', (e) => {
+                let cleanVal = e.target.value.replace(/\D/g, '');
+                e.target.value = cleanVal;
+                settings.simParent2IV = parseInt(cleanVal, 10) || 0;
+                lastStateSignature = '';
+            });
+        }
+
+        const simP2QInput = document.getElementById('simP2QInput');
+        if (simP2QInput) {
+            simP2QInput.addEventListener('input', (e) => {
+                let cleanVal = e.target.value.replace(/[^\d.]/g, '');
+                if (cleanVal.split('.').length > 2) cleanVal = cleanVal.replace(/\.+$/, '');
+                const parts = cleanVal.split('.');
+                if (parts.length === 2 && parts[1].length > 4) {
+                    cleanVal = parts[0] + '.' + parts[1].substring(0, 4);
+                }
+                e.target.value = cleanVal;
+                settings.simParent2QRaw = cleanVal;
+                settings.simParent2Q = parseFloat(cleanVal) || 0;
                 lastStateSignature = '';
             });
         }
