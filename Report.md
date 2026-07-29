@@ -15,7 +15,7 @@ The following graph plots the absolute Gold Cost (in logarithmic scale) required
 
 ## ⏳ 2. Breeding Operations (Time) Analysis
 
-Gold isn't the only currency; time (measured in clicks or breeding operations) is just as critical. This graph estimates the total amount of individual breeding operations a player must perform.
+Gold isn't the only currency; time is just as critical. This graph estimates the total amount of individual breeding operations a player must perform.
 
 > [!TIP]
 > **Key Finding for Players**
@@ -54,7 +54,7 @@ To validate the code, we simulated thousands of RNG loops to test how the game's
 
 ## 🧬 5. Double Stones and Expected IV Growth
 
-As requested, we evaluated the impact of using **Double Stones** (+5% chance of +1 IV per breed). Since the IV gain is strictly tied to the amount of breeds on the *Main Chain* (secondary parents do not pass their IV directly up the chain in the exact same way as the primary, but rather the highest quality is inherited), the amount of IVs you can expect to farm is directly proportional to how many small steps you take.
+We evaluated the impact of using **Double Stones** (+5% chance of +1 IV per breed). Since the IV gain is strictly tied to the amount of breeds on the *Main Chain* (secondary parents do not pass their IV directly up the chain in the exact same way as the primary, but rather the highest quality is inherited), the amount of IVs you can expect to farm is directly proportional to how many small steps you take.
 
 As shown in the graph below:
 - **Free Mode (Red):** Yields the most IVs (up to 8+ extra IVs when reaching Ancient 2.6) because you breed so many times on the main chain.
