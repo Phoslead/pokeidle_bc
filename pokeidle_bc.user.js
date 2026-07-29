@@ -5,7 +5,7 @@
 // @description  Breeding calculator with estimation and Sub-chain Secondary Breeding Costs
 // @author       Phoslead
 // @match        https://poke.idleworld.online/*
-// @grant        GM_addStyle
+// @grant        none
 // ==/UserScript==
 
 (function() {
